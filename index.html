@@ -1,0 +1,820 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>50 Global Enterprises — Interactive 3D WebXR Scatter Plot</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      background-color: #050811;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      color: #f1f5f9;
+      user-select: none;
+    }
+    #desktop-ui {
+      position: absolute;
+      top: 16px;
+      left: 16px;
+      z-index: 10;
+      background: rgba(15, 23, 42, 0.85);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      padding: 16px 20px;
+      border-radius: 10px;
+      backdrop-filter: blur(8px);
+      max-width: 380px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+    }
+    #desktop-ui h1 {
+      margin: 0 0 6px 0;
+      font-size: 1.15rem;
+      font-weight: 700;
+      color: #38bdf8;
+    }
+    #desktop-ui p {
+      margin: 4px 0;
+      font-size: 0.82rem;
+      line-height: 1.35;
+      color: #94a3b8;
+    }
+    #xr-bar {
+      position: absolute;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      gap: 12px;
+      z-index: 10;
+    }
+    .btn-xr {
+      background: #0284c7;
+      color: #ffffff;
+      border: none;
+      padding: 12px 22px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      border-radius: 8px;
+      cursor: pointer;
+      box-shadow: 0 4px 14px rgba(2, 132, 199, 0.4);
+      transition: all 0.2s ease;
+    }
+    .btn-xr:hover {
+      background: #0369a1;
+      transform: translateY(-2px);
+    }
+    .btn-ar {
+      background: #0d9488;
+      box-shadow: 0 4px 14px rgba(13, 148, 136, 0.4);
+    }
+    .btn-ar:hover {
+      background: #0f766e;
+    }
+    #fallback-msg {
+      margin-top: 8px;
+      font-size: 0.78rem;
+      color: #e2e8f0;
+      font-style: italic;
+    }
+  </style>
+  <script src="https://unpkg.com/three@0.160.0/build/three.min.js"></script>
+  <script src="https://unpkg.com/three@0.160.0/examples/js/controls/OrbitControls.js"></script>
+</head>
+<body>
+  <div id="desktop-ui">
+    <h1>Corporate Landscape (50 Companies)</h1>
+    <p><strong>X:</strong> Annual Revenue (Log USD)</p>
+    <p><strong>Y:</strong> Market Capitalisation (Log USD)</p>
+    <p><strong>Z:</strong> Employees (Log Headcount)</p>
+    <p><strong>Size:</strong> Age | <strong>Colour:</strong> Industry Sector</p>
+    <p id="fallback-msg">Desktop: Drag to orbit, scroll to zoom, click spheres to inspect. On Meta Quest 3: click Enter VR or Passthrough.</p>
+  </div>
+
+  <div id="xr-bar">
+    <button id="btn-vr" class="btn-xr">Enter VR</button>
+    <button id="btn-ar" class="btn-xr btn-ar">Enter Passthrough (AR)</button>
+  </div>
+
+  <script>
+    // --- 1. DATASET: 50 Real Companies, 5 Sectors (Strictly No Generated/Random Numbers) ---
+    const SECTORS = {
+      'Technology': { color: 0x00e5ff, hex: '#00e5ff', visible: true },
+      'Retail':     { color: 0xff9100, hex: '#ff9100', visible: true },
+      'Energy':     { color: 0x00e676, hex: '#00e676', visible: true },
+      'Finance':    { color: 0xd500f9, hex: '#d500f9', visible: true },
+      'Healthcare': { color: 0xff1744, hex: '#ff1744', visible: true }
+    };
+
+    // Revenue ($B), Market Cap ($B), Employees (count), Age (years)
+    const COMPANIES = [
+      // Technology (10)
+      { name: "Apple", sector: "Technology", rev: 385, cap: 3400, emp: 161000, age: 48 },
+      { name: "Microsoft", sector: "Technology", rev: 245, cap: 3100, emp: 228000, age: 49 },
+      { name: "Alphabet", sector: "Technology", rev: 307, cap: 2100, emp: 182000, age: 26 },
+      { name: "NVIDIA", sector: "Technology", rev: 96, cap: 3000, emp: 30000, age: 31 },
+      { name: "Meta", sector: "Technology", rev: 135, cap: 1400, emp: 70000, age: 20 },
+      { name: "Oracle", sector: "Technology", rev: 53, cap: 450, emp: 159000, age: 47 },
+      { name: "Adobe", sector: "Technology", rev: 19, cap: 230, emp: 30000, age: 42 },
+      { name: "Salesforce", sector: "Technology", rev: 35, cap: 280, emp: 72000, age: 25 },
+      { name: "Cisco Systems", sector: "Technology", rev: 54, cap: 210, emp: 84000, age: 40 },
+      { name: "Intel", sector: "Technology", rev: 54, cap: 95, emp: 125000, age: 56 },
+
+      // Retail & E-Commerce (10)
+      { name: "Walmart", sector: "Retail", rev: 648, cap: 650, emp: 2100000, age: 62 },
+      { name: "Amazon", sector: "Retail", rev: 575, cap: 1950, emp: 1520000, age: 30 },
+      { name: "Costco Wholesale", sector: "Retail", rev: 242, cap: 390, emp: 333000, age: 41 },
+      { name: "Home Depot", sector: "Retail", rev: 153, cap: 400, emp: 465000, age: 46 },
+      { name: "Target", sector: "Retail", rev: 107, cap: 65, emp: 415000, age: 62 },
+      { name: "Lowe's", sector: "Retail", rev: 86, cap: 150, emp: 300000, age: 103 },
+      { name: "Inditex (Zara)", sector: "Retail", rev: 39, cap: 160, emp: 165000, age: 49 },
+      { name: "TJX Companies", sector: "Retail", rev: 54, cap: 130, emp: 349000, age: 48 },
+      { name: "Nike", sector: "Retail", rev: 51, cap: 125, emp: 83000, age: 60 },
+      { name: "Starbucks", sector: "Retail", rev: 36, cap: 110, emp: 380000, age: 53 },
+
+      // Energy (10)
+      { name: "ExxonMobil", sector: "Energy", rev: 345, cap: 460, emp: 62000, age: 154 },
+      { name: "Chevron", sector: "Energy", rev: 200, cap: 280, emp: 45000, age: 145 },
+      { name: "Shell", sector: "Energy", rev: 316, cap: 220, emp: 103000, age: 117 },
+      { name: "TotalEnergies", sector: "Energy", rev: 237, cap: 160, emp: 102000, age: 100 },
+      { name: "BP", sector: "Energy", rev: 213, cap: 100, emp: 87000, age: 115 },
+      { name: "ConocoPhillips", sector: "Energy", rev: 58, cap: 130, emp: 10000, age: 107 },
+      { name: "NextEra Energy", sector: "Energy", rev: 28, cap: 165, emp: 16800, age: 99 },
+      { name: "Enbridge", sector: "Energy", rev: 32, cap: 85, emp: 12000, age: 75 },
+      { name: "Equinor", sector: "Energy", rev: 107, cap: 75, emp: 23000, age: 52 },
+      { name: "Duke Energy", sector: "Energy", rev: 29, cap: 88, emp: 27000, age: 120 },
+
+      // Finance & Banking (10)
+      { name: "JPMorgan Chase", sector: "Finance", rev: 158, cap: 610, emp: 310000, age: 225 },
+      { name: "Berkshire Hathaway", sector: "Finance", rev: 364, cap: 980, emp: 396000, age: 185 },
+      { name: "Visa", sector: "Finance", rev: 33, cap: 560, emp: 28800, age: 66 },
+      { name: "Mastercard", sector: "Finance", rev: 25, cap: 450, emp: 33400, age: 58 },
+      { name: "Bank of America", sector: "Finance", rev: 98, cap: 320, emp: 213000, age: 120 },
+      { name: "Wells Fargo", sector: "Finance", rev: 82, cap: 200, emp: 226000, age: 172 },
+      { name: "Morgan Stanley", sector: "Finance", rev: 54, cap: 170, emp: 80000, age: 89 },
+      { name: "Goldman Sachs", sector: "Finance", rev: 46, cap: 170, emp: 45000, age: 155 },
+      { name: "BlackRock", sector: "Finance", rev: 18, cap: 140, emp: 19800, age: 36 },
+      { name: "American Express", sector: "Finance", rev: 61, cap: 190, emp: 74000, age: 174 },
+
+      // Healthcare & Pharma (10)
+      { name: "UnitedHealth Group", sector: "Healthcare", rev: 372, cap: 540, emp: 440000, age: 47 },
+      { name: "Johnson & Johnson", sector: "Healthcare", rev: 85, cap: 380, emp: 131000, age: 138 },
+      { name: "Eli Lilly", sector: "Healthcare", rev: 34, cap: 820, emp: 43000, age: 148 },
+      { name: "Novo Nordisk", sector: "Healthcare", rev: 33, cap: 580, emp: 64000, age: 101 },
+      { name: "Pfizer", sector: "Healthcare", rev: 58, cap: 165, emp: 88000, age: 175 },
+      { name: "AbbVie", sector: "Healthcare", rev: 54, cap: 340, emp: 50000, age: 11 },
+      { name: "Merck & Co.", sector: "Healthcare", rev: 60, cap: 290, emp: 72000, age: 133 },
+      { name: "Thermo Fisher Scientific", sector: "Healthcare", rev: 43, cap: 205, emp: 122000, age: 68 },
+      { name: "Abbott Laboratories", sector: "Healthcare", rev: 40, cap: 200, emp: 114000, age: 136 },
+      { name: "CVS Health", sector: "Healthcare", rev: 358, cap: 75, emp: 300000, age: 61 }
+    ];
+
+    // --- 2. THREE.JS INITIALIZATION & SCENE SETUP ---
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x060913);
+
+    const camera = new THREE.PerspectiveCamera(65, window.innerWidth / window.innerHeight, 0.05, 100);
+    camera.position.set(0, 1.45, 0.3);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.xr.enabled = true;
+    document.body.appendChild(renderer.domElement);
+
+    const controls = new THREE.OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.05;
+    controls.target.set(0, 1.25, -1.8);
+
+    // Lighting
+    const ambLight = new THREE.AmbientLight(0xffffff, 0.9);
+    scene.add(ambLight);
+    const dirLight = new THREE.DirectionalLight(0xffffff, 1.2);
+    dirLight.position.set(3, 6, 2);
+    scene.add(dirLight);
+
+    // Master container placed 1.8m in front of user at eye height
+    const mainAnchor = new THREE.Group();
+    mainAnchor.position.set(0, 0.9, -1.8);
+    scene.add(mainAnchor);
+
+    // Rotating plot core (User rotation affects this group)
+    const plotCore = new THREE.Group();
+    mainAnchor.add(plotCore);
+
+    // Bounding plot dimensions (meters)
+    const BOX_W = 1.2;  // X: Revenue
+    const BOX_H = 0.85; // Y: Market Cap
+    const BOX_D = 1.2;  // Z: Employees
+
+    // Coordinate logarithmic ranges
+    const MIN_LOG_REV = Math.log10(15);
+    const MAX_LOG_REV = Math.log10(700);
+    const MIN_LOG_CAP = Math.log10(50);
+    const MAX_LOG_CAP = Math.log10(4000);
+    const MIN_LOG_EMP = Math.log10(9000);
+    const MAX_LOG_EMP = Math.log10(2300000);
+
+    function mapX(val) {
+      const norm = (Math.log10(val) - MIN_LOG_REV) / (MAX_LOG_REV - MIN_LOG_REV);
+      return -BOX_W / 2 + norm * BOX_W;
+    }
+    function mapY(val) {
+      const norm = (Math.log10(val) - MIN_LOG_CAP) / (MAX_LOG_CAP - MIN_LOG_CAP);
+      return norm * BOX_H;
+    }
+    function mapZ(val) {
+      const norm = (Math.log10(val) - MIN_LOG_EMP) / (MAX_LOG_EMP - MIN_LOG_EMP);
+      return -BOX_D / 2 + norm * BOX_D;
+    }
+    function mapRadius(age) {
+      const norm = Math.min(Math.max((age - 10) / (230 - 10), 0), 1);
+      return 0.016 + norm * (0.042 - 0.016);
+    }
+
+    // --- 3. HIGH-CONTRAST CANVAS TEXTURE GENERATOR (Strict depthTest: true) ---
+    const billboardPanels = [];
+
+    function makeTextTexture(lines, options = {}) {
+      const width = options.width || 512;
+      const height = options.height || 256;
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+
+      // Solid opaque background for high contrast in passthrough mode
+      ctx.fillStyle = options.bgColor || '#0f172a';
+      ctx.fillRect(0, 0, width, height);
+
+      // Border outline
+      ctx.lineWidth = options.borderWidth || 4;
+      ctx.strokeStyle = options.borderColor || '#38bdf8';
+      ctx.strokeRect(4, 4, width - 8, height - 8);
+
+      let startY = options.startY || 45;
+      lines.forEach((l) => {
+        ctx.fillStyle = l.color || '#f8fafc';
+        ctx.font = l.font || 'bold 22px Arial, sans-serif';
+        ctx.textAlign = l.align || 'center';
+        const posX = l.align === 'left' ? 24 : (l.align === 'right' ? width - 24 : width / 2);
+        ctx.fillText(l.text, posX, startY);
+        startY += (l.spacing || 34);
+      });
+
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.needsUpdate = true;
+      return { texture, canvas, ctx, width, height };
+    }
+
+    function createPanelMesh(textureObj, planeW, planeH) {
+      const mat = new THREE.MeshBasicMaterial({
+        map: textureObj.texture,
+        transparent: false,
+        depthTest: true
+      });
+      const geom = new THREE.PlaneGeometry(planeW, planeH);
+      const mesh = new THREE.Mesh(geom, mat);
+      return mesh;
+    }
+
+    // --- 4. GRID, BOUNDS & DEPTH CUES ---
+    const gridFloor = new THREE.GridHelper(BOX_W, 6, 0x38bdf8, 0x1e293b);
+    gridFloor.position.set(0, 0, 0);
+    plotCore.add(gridFloor);
+
+    // Axis Line Segments
+    const axisMat = new THREE.LineBasicMaterial({ color: 0x64748b, linewidth: 2, depthTest: true });
+    const axisGeom = new THREE.BufferGeometry().setFromPoints([
+      // Origin at (-BOX_W/2, 0, -BOX_D/2)
+      new THREE.Vector3(-BOX_W/2, 0, -BOX_D/2), new THREE.Vector3(BOX_W/2, 0, -BOX_D/2), // X
+      new THREE.Vector3(-BOX_W/2, 0, -BOX_D/2), new THREE.Vector3(-BOX_W/2, BOX_H, -BOX_D/2), // Y
+      new THREE.Vector3(-BOX_W/2, 0, -BOX_D/2), new THREE.Vector3(-BOX_W/2, 0, BOX_D/2)  // Z
+    ]);
+    const axisLines = new THREE.LineSegments(axisGeom, axisMat);
+    plotCore.add(axisLines);
+
+    // Non-overlapping Axis Labels with Opaque Backing
+    const labelX = createPanelMesh(makeTextTexture([
+      { text: "X: REVENUE (USD LOG)", color: "#38bdf8", font: "bold 24px Arial" },
+      { text: "Range: $18B → $648B", color: "#94a3b8", font: "18px Arial" }
+    ], { width: 340, height: 110 }), 0.34, 0.11);
+    labelX.position.set(BOX_W/2 + 0.16, 0.06, -BOX_D/2);
+    plotCore.add(labelX);
+    billboardPanels.push(labelX);
+
+    const labelY = createPanelMesh(makeTextTexture([
+      { text: "Y: MARKET VALUATION (USD LOG)", color: "#38bdf8", font: "bold 24px Arial" },
+      { text: "Range: $65B → $3.4T", color: "#94a3b8", font: "18px Arial" }
+    ], { width: 420, height: 110 }), 0.42, 0.11);
+    labelY.position.set(-BOX_W/2, BOX_H + 0.08, -BOX_D/2);
+    plotCore.add(labelY);
+    billboardPanels.push(labelY);
+
+    const labelZ = createPanelMesh(makeTextTexture([
+      { text: "Z: EMPLOYEES (LOG)", color: "#38bdf8", font: "bold 24px Arial" },
+      { text: "Range: 10k → 2.1M", color: "#94a3b8", font: "18px Arial" }
+    ], { width: 340, height: 110 }), 0.34, 0.11);
+    labelZ.position.set(-BOX_W/2 - 0.14, 0.06, BOX_D/2 + 0.1);
+    plotCore.add(labelZ);
+    billboardPanels.push(labelZ);
+
+    // --- 5. ENTERPRISE DATA POINTS & ENLARGED COLLIDERS ---
+    const interactiveColliders = [];
+    const sphereMeshes = [];
+    const stemLines = [];
+
+    const sphereGeom = new THREE.SphereGeometry(1, 18, 14);
+    const discGeom = new THREE.RingGeometry(0.005, 0.016, 16);
+    discGeom.rotateX(-Math.PI / 2);
+
+    COMPANIES.forEach((comp, idx) => {
+      const posX = mapX(comp.rev);
+      const posY = mapY(comp.cap);
+      const posZ = mapZ(comp.emp);
+      const rad = mapRadius(comp.age);
+      const secConf = SECTORS[comp.sector];
+
+      // Visual Sphere
+      const sphereMat = new THREE.MeshStandardMaterial({
+        color: secConf.color,
+        roughness: 0.35,
+        metalness: 0.2,
+        depthTest: true
+      });
+      const sphere = new THREE.Mesh(sphereGeom, sphereMat);
+      sphere.scale.set(rad, rad, rad);
+      sphere.position.set(posX, posY, posZ);
+      sphere.userData = { company: comp, baseScale: rad, index: idx };
+      plotCore.add(sphere);
+      sphereMeshes.push(sphere);
+
+      // Depth Cue: Drop line from point to floor
+      const stemGeom = new THREE.BufferGeometry().setFromPoints([
+        new THREE.Vector3(posX, posY, posZ),
+        new THREE.Vector3(posX, 0, posZ)
+      ]);
+      const stemMat = new THREE.LineBasicMaterial({
+        color: secConf.color,
+        transparent: true,
+        opacity: 0.35,
+        depthTest: true
+      });
+      const stem = new THREE.Line(stemGeom, stemMat);
+      stem.userData = { sector: comp.sector };
+      plotCore.add(stem);
+      stemLines.push(stem);
+
+      // Depth Cue: Base disc on ground
+      const discMat = new THREE.MeshBasicMaterial({
+        color: secConf.color,
+        side: THREE.DoubleSide,
+        depthTest: true
+      });
+      const disc = new THREE.Mesh(discGeom, discMat);
+      disc.position.set(posX, 0.001, posZ);
+      disc.userData = { sector: comp.sector };
+      plotCore.add(disc);
+      stemLines.push(disc);
+
+      // Forgiving Pointing: Enlarged invisible collider
+      const colRadius = Math.max(rad * 2.0, 0.065);
+      const colGeom = new THREE.SphereGeometry(colRadius, 10, 8);
+      const colMat = new THREE.MeshBasicMaterial({
+        visible: false,
+        depthTest: true
+      });
+      const collider = new THREE.Mesh(colGeom, colMat);
+      collider.position.set(posX, posY, posZ);
+      collider.userData = { targetSphere: sphere, type: 'company', company: comp };
+      plotCore.add(collider);
+      interactiveColliders.push(collider);
+    });
+
+    // --- 6. IN-SCENE UI PANELS (TITLE, FIRST-TIMER INSTRUCTION, DISCLAIMER, EXIT) ---
+    // Title & Disclaimer Banner
+    const titleTex = makeTextTexture([
+      { text: "GLOBAL ENTERPRISE 3D SCATTER PLOT", color: "#38bdf8", font: "bold 26px Arial" },
+      { text: "X: Revenue (Log)  |  Y: Market Cap (Log)  |  Z: Workforce (Log)  |  Size: Age", color: "#e2e8f0", font: "18px Arial" },
+      { text: "*Illustrative & approximate corporate metrics. Not a citable financial source.", color: "#facc15", font: "italic 16px Arial" }
+    ], { width: 760, height: 160 });
+    const titlePanel = createPanelMesh(titleTex, 1.25, 0.28);
+    titlePanel.position.set(0, BOX_H + 0.38, 0);
+    mainAnchor.add(titlePanel);
+    billboardPanels.push(titlePanel);
+
+    // First-Timer Instruction (Constraint 3)
+    const instructTex = makeTextTexture([
+      { text: "Point laser at any sphere & pull trigger to inspect.", color: "#38bdf8", font: "bold 23px Arial" },
+      { text: "Pull trigger on empty space to rotate the plot. Click sectors to filter.", color: "#94a3b8", font: "18px Arial" }
+    ], { width: 680, height: 120 });
+    const instructPanel = createPanelMesh(instructTex, 1.1, 0.2);
+    instructPanel.position.set(0, -0.16, 0.55);
+    mainAnchor.add(instructPanel);
+    billboardPanels.push(instructPanel);
+
+    // In-Scene Exit VR Button (Constraint 1)
+    const exitTex = makeTextTexture([
+      { text: "✕  EXIT VR SESSION", color: "#ffffff", font: "bold 26px Arial" }
+    ], { width: 340, height: 110, bgColor: "#dc2626", borderColor: "#fca5a5" });
+    const exitPanel = createPanelMesh(exitTex, 0.35, 0.11);
+    exitPanel.position.set(BOX_W/2 + 0.24, BOX_H + 0.36, 0);
+    exitPanel.userData = { type: 'exit-vr' };
+    mainAnchor.add(exitPanel);
+    billboardPanels.push(exitPanel);
+    interactiveColliders.push(exitPanel);
+
+    // --- 7. IN-SCENE INTERACTIVE LEGEND (SECTOR FILTERING) ---
+    const legendGroup = new THREE.Group();
+    legendGroup.position.set(-BOX_W/2 - 0.32, BOX_H * 0.45, 0);
+    mainAnchor.add(legendGroup);
+
+    const legendTitleTex = makeTextTexture([
+      { text: "SECTORS (FILTER)", color: "#38bdf8", font: "bold 22px Arial" }
+    ], { width: 320, height: 70 });
+    const legendTitle = createPanelMesh(legendTitleTex, 0.36, 0.08);
+    legendTitle.position.set(0, 0.22, 0);
+    legendGroup.add(legendTitle);
+    billboardPanels.push(legendTitle);
+
+    const legendButtonMeshes = [];
+    let lIdx = 0;
+    for (const [sectorName, sConf] of Object.entries(SECTORS)) {
+      const btnTex = makeTextTexture([
+        { text: `● ${sectorName.toUpperCase()}`, color: sConf.hex, font: "bold 22px Arial" }
+      ], { width: 320, height: 75, borderColor: sConf.hex });
+      const btnMesh = createPanelMesh(btnTex, 0.36, 0.085);
+      btnMesh.position.set(0, 0.12 - (lIdx * 0.105), 0);
+      btnMesh.userData = { type: 'legend', sector: sectorName, active: true, texData: btnTex, conf: sConf };
+      legendGroup.add(btnMesh);
+      legendButtonMeshes.push(btnMesh);
+      interactiveColliders.push(btnMesh);
+      billboardPanels.push(btnMesh);
+      lIdx++;
+    }
+
+    // --- 8. FLOATING INSPECTION CARD ---
+    const detailsCanvasObj = makeTextTexture([
+      { text: "SELECT A COMPANY", color: "#38bdf8", font: "bold 24px Arial" },
+      { text: "Laser point and pull trigger on any sphere", color: "#94a3b8", font: "18px Arial" }
+    ], { width: 600, height: 380, borderColor: "#38bdf8" });
+    const detailsPanel = createPanelMesh(detailsCanvasObj, 0.65, 0.42);
+    detailsPanel.position.set(BOX_W/2 + 0.45, BOX_H * 0.45, 0);
+    mainAnchor.add(detailsPanel);
+    billboardPanels.push(detailsPanel);
+
+    function updateDetailsCard(company) {
+      const ctx = detailsCanvasObj.ctx;
+      const w = detailsCanvasObj.width;
+      const h = detailsCanvasObj.height;
+      const sConf = SECTORS[company.sector];
+
+      ctx.fillStyle = '#0f172a';
+      ctx.fillRect(0, 0, w, h);
+      ctx.lineWidth = 5;
+      ctx.strokeStyle = sConf.hex;
+      ctx.strokeRect(4, 4, w - 8, h - 8);
+
+      // Header Banner
+      ctx.fillStyle = sConf.hex;
+      ctx.font = 'bold 28px Arial, sans-serif';
+      ctx.textAlign = 'left';
+      ctx.fillText(company.name.toUpperCase(), 24, 44);
+
+      ctx.fillStyle = '#94a3b8';
+      ctx.font = 'bold 18px Arial, sans-serif';
+      ctx.fillText(`SECTOR: ${company.sector.toUpperCase()}`, 24, 76);
+
+      // Divider
+      ctx.strokeStyle = '#334155';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(24, 94);
+      ctx.lineTo(w - 24, 94);
+      ctx.stroke();
+
+      // Metrics Table
+      ctx.font = '20px Arial, sans-serif';
+      ctx.fillStyle = '#f8fafc';
+      ctx.fillText(`• Market Valuation:`, 24, 134);
+      ctx.fillStyle = '#38bdf8';
+      ctx.fillText(`$${company.cap.toLocaleString()} Billion USD`, 260, 134);
+
+      ctx.fillStyle = '#f8fafc';
+      ctx.fillText(`• Annual Revenue:`, 24, 180);
+      ctx.fillStyle = '#38bdf8';
+      ctx.fillText(`$${company.rev.toLocaleString()} Billion USD`, 260, 180);
+
+      ctx.fillStyle = '#f8fafc';
+      ctx.fillText(`• Global Workforce:`, 24, 226);
+      ctx.fillStyle = '#38bdf8';
+      ctx.fillText(`${company.emp.toLocaleString()} employees`, 260, 226);
+
+      ctx.fillStyle = '#f8fafc';
+      ctx.fillText(`• Enterprise Age:`, 24, 272);
+      ctx.fillStyle = '#38bdf8';
+      ctx.fillText(`${company.age} years`, 260, 272);
+
+      // Footer note
+      ctx.fillStyle = '#facc15';
+      ctx.font = 'italic 16px Arial, sans-serif';
+      ctx.fillText(`*Illustrative approximate figures for 3D spatial comparison`, 24, 335);
+
+      detailsCanvasObj.texture.needsUpdate = true;
+      instructPanel.visible = false; // Hide instruction once user knows what they are doing
+    }
+
+    // --- 9. SECTOR TOGGLE LOGIC ---
+    function toggleSector(sectorName, btnMesh) {
+      const active = !SECTORS[sectorName].visible;
+      SECTORS[sectorName].visible = active;
+      btnMesh.userData.active = active;
+
+      // Update button visual
+      const ctx = btnMesh.userData.texData.ctx;
+      const w = btnMesh.userData.texData.width;
+      const h = btnMesh.userData.texData.height;
+      const conf = btnMesh.userData.conf;
+
+      ctx.fillStyle = active ? '#0f172a' : '#1e293b';
+      ctx.fillRect(0, 0, w, h);
+      ctx.lineWidth = 4;
+      ctx.strokeStyle = active ? conf.hex : '#475569';
+      ctx.strokeRect(4, 4, w - 8, h - 8);
+
+      ctx.fillStyle = active ? conf.hex : '#64748b';
+      ctx.font = 'bold 22px Arial, sans-serif';
+      ctx.textAlign = 'center';
+      const label = active ? `● ${sectorName.toUpperCase()}` : `○ ${sectorName.toUpperCase()} (HIDDEN)`;
+      ctx.fillText(label, w / 2, 45);
+      btnMesh.userData.texData.texture.needsUpdate = true;
+
+      // Update sphere visibility
+      sphereMeshes.forEach(s => {
+        if (s.userData.company.sector === sectorName) {
+          s.visible = active;
+        }
+      });
+      // Update drop lines & discs
+      stemLines.forEach(l => {
+        if (l.userData.sector === sectorName) {
+          l.visible = active;
+        }
+      });
+    }
+
+    // --- 10. RECOVERY / IDLE SYSTEM (45-Second Inactivity Reset) ---
+    let lastActivityTime = Date.now();
+    let hasModifiedState = false;
+
+    function registerActivity() {
+      lastActivityTime = Date.now();
+      hasModifiedState = true;
+    }
+
+    function resetToCleanState() {
+      // 1. Restore all sectors
+      legendButtonMeshes.forEach(btn => {
+        if (!btn.userData.active) {
+          toggleSector(btn.userData.sector, btn);
+        }
+      });
+      // 2. Reset plot rotation
+      plotCore.rotation.y = 0;
+      // 3. Reset details panel
+      const ctx = detailsCanvasObj.ctx;
+      const w = detailsCanvasObj.width;
+      const h = detailsCanvasObj.height;
+      ctx.fillStyle = '#0f172a';
+      ctx.fillRect(0, 0, w, h);
+      ctx.lineWidth = 4;
+      ctx.strokeStyle = '#38bdf8';
+      ctx.strokeRect(4, 4, w - 8, h - 8);
+      ctx.fillStyle = '#38bdf8';
+      ctx.font = 'bold 24px Arial, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText("SELECT A COMPANY", w / 2, 160);
+      ctx.fillStyle = '#94a3b8';
+      ctx.font = '18px Arial, sans-serif';
+      ctx.fillText("Laser point and pull trigger on any sphere", w / 2, 210);
+      detailsCanvasObj.texture.needsUpdate = true;
+
+      // 4. Show instruction panel again
+      instructPanel.visible = true;
+      hasModifiedState = false;
+    }
+
+    // --- 11. WEBXR CONTROLLERS, LASER POINTERS & GRAB ROTATION ---
+    const raycaster = new THREE.Raycaster();
+    const tempMatrix = new THREE.Matrix4();
+    let hoveredObject = null;
+
+    // Laser Pointer Mesh
+    function buildControllerPointer() {
+      const lineGeom = new THREE.BufferGeometry().setFromPoints([
+        new THREE.Vector3(0, 0, 0),
+        new THREE.Vector3(0, 0, -2.5)
+      ]);
+      const lineMat = new THREE.LineBasicMaterial({
+        color: 0x38bdf8,
+        transparent: true,
+        opacity: 0.8,
+        depthTest: true
+      });
+      const laser = new THREE.Line(lineGeom, lineMat);
+
+      // Pointer dot
+      const dotGeom = new THREE.SphereGeometry(0.008, 8, 8);
+      const dotMat = new THREE.MeshBasicMaterial({ color: 0x00e5ff, depthTest: true });
+      const dot = new THREE.Mesh(dotGeom, dotMat);
+      dot.position.z = -2.5;
+      laser.add(dot);
+      return laser;
+    }
+
+    const controller0 = renderer.xr.getController(0);
+    const controller1 = renderer.xr.getController(1);
+    [controller0, controller1].forEach(ctrl => {
+      ctrl.add(buildControllerPointer());
+      scene.add(ctrl);
+    });
+
+    // Twist / Grab state in VR
+    let activeGrabController = null;
+    let grabInitialHandAngle = 0;
+    let grabInitialPlotAngle = 0;
+
+    function handleTriggerDown(event) {
+      registerActivity();
+      const ctrl = event.target;
+      tempMatrix.identity().extractRotation(ctrl.matrixWorld);
+      raycaster.ray.origin.setFromMatrixPosition(ctrl.matrixWorld);
+      raycaster.ray.direction.set(0, 0, -1).applyMatrix4(tempMatrix);
+
+      const hits = raycaster.intersectObjects(interactiveColliders, false);
+      if (hits.length > 0) {
+        const hit = hits[0].object;
+        if (hit.userData.type === 'company') {
+          updateDetailsCard(hit.userData.company);
+        } else if (hit.userData.type === 'legend') {
+          toggleSector(hit.userData.sector, hit);
+        } else if (hit.userData.type === 'exit-vr') {
+          const session = renderer.xr.getSession();
+          if (session) session.end();
+        }
+      } else {
+        // Grab empty space to rotate
+        activeGrabController = ctrl;
+        const handPos = ctrl.position;
+        grabInitialHandAngle = Math.atan2(handPos.x - mainAnchor.position.x, handPos.z - mainAnchor.position.z);
+        grabInitialPlotAngle = plotCore.rotation.y;
+      }
+    }
+
+    function handleTriggerUp(event) {
+      if (activeGrabController === event.target) {
+        activeGrabController = null;
+      }
+    }
+
+    controller0.addEventListener('selectstart', handleTriggerDown);
+    controller0.addEventListener('selectend', handleTriggerUp);
+    controller1.addEventListener('selectstart', handleTriggerDown);
+    controller1.addEventListener('selectend', handleTriggerUp);
+
+    // Desktop Raycasting & Interactions
+    const mouse = new THREE.Vector2(-999, -999);
+    window.addEventListener('mousemove', (e) => {
+      registerActivity();
+      mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+      mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+    });
+
+    window.addEventListener('click', () => {
+      registerActivity();
+      raycaster.setFromCamera(mouse, camera);
+      const hits = raycaster.intersectObjects(interactiveColliders, false);
+      if (hits.length > 0) {
+        const hit = hits[0].object;
+        if (hit.userData.type === 'company') {
+          updateDetailsCard(hit.userData.company);
+        } else if (hit.userData.type === 'legend') {
+          toggleSector(hit.userData.sector, hit);
+        } else if (hit.userData.type === 'exit-vr') {
+          const session = renderer.xr.getSession();
+          if (session) session.end();
+        }
+      }
+    });
+
+    // --- 12. WEBXR LAUNCH HANDLERS (VR & PASSTHROUGH AR) ---
+    const btnVR = document.getElementById('btn-vr');
+    const btnAR = document.getElementById('btn-ar');
+
+    if ('xr' in navigator) {
+      navigator.xr.isSessionSupported('immersive-vr').then(supported => {
+        if (!supported) btnVR.style.display = 'none';
+      });
+      navigator.xr.isSessionSupported('immersive-ar').then(supported => {
+        if (!supported) btnAR.style.display = 'none';
+      });
+    } else {
+      btnVR.style.display = 'none';
+      btnAR.style.display = 'none';
+      document.getElementById('fallback-msg').textContent = "WebXR not supported on this browser. Use mouse to orbit and inspect on desktop.";
+    }
+
+    async function startXRSession(mode) {
+      const sessionInit = { optionalFeatures: ['local-floor', 'bounded-floor', 'hand-tracking'] };
+      try {
+        const session = await navigator.xr.requestSession(mode, sessionInit);
+        renderer.xr.setSession(session);
+        if (mode === 'immersive-ar') {
+          scene.background = null; // Passthrough transparency
+        }
+        session.addEventListener('end', () => {
+          scene.background = new THREE.Color(0x060913);
+        });
+      } catch (err) {
+        console.error("Failed to start WebXR session: ", err);
+        alert("WebXR session could not start: " + err.message);
+      }
+    }
+
+    btnVR.addEventListener('click', () => startXRSession('immersive-vr'));
+    btnAR.addEventListener('click', () => startXRSession('immersive-ar'));
+
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    // --- 13. MAIN ANIMATION LOOP (QUEST 3 72/90Hz OPTIMIZED) ---
+    renderer.setAnimationLoop(() => {
+      // 1. Idle Recovery Check (45 Seconds)
+      if (hasModifiedState && Date.now() - lastActivityTime > 45000) {
+        resetToCleanState();
+      }
+
+      // 2. Controller Twist / Grab Rotation
+      if (activeGrabController) {
+        const handPos = activeGrabController.position;
+        const currentAngle = Math.atan2(handPos.x - mainAnchor.position.x, handPos.z - mainAnchor.position.z);
+        const delta = currentAngle - grabInitialHandAngle;
+        plotCore.rotation.y = grabInitialPlotAngle + delta * 1.5;
+      }
+
+      // 3. Forgiving Hover Detection (VR Controller 0/1 or Desktop Mouse)
+      let activeHit = null;
+      if (renderer.xr.isPresenting) {
+        // Use primary active controller for hover ray
+        const ctrl = controller0;
+        tempMatrix.identity().extractRotation(ctrl.matrixWorld);
+        raycaster.ray.origin.setFromMatrixPosition(ctrl.matrixWorld);
+        raycaster.ray.direction.set(0, 0, -1).applyMatrix4(tempMatrix);
+        const hits = raycaster.intersectObjects(interactiveColliders, false);
+        if (hits.length > 0) activeHit = hits[0].object;
+      } else {
+        raycaster.setFromCamera(mouse, camera);
+        const hits = raycaster.intersectObjects(interactiveColliders, false);
+        if (hits.length > 0) activeHit = hits[0].object;
+      }
+
+      // Apply Hover Highlight Before Selection (Constraint 7)
+      if (activeHit && activeHit.userData.type === 'company') {
+        const sphere = activeHit.userData.targetSphere;
+        if (hoveredObject !== sphere) {
+          if (hoveredObject) {
+            hoveredObject.scale.setScalar(hoveredObject.userData.baseScale);
+            hoveredObject.material.emissive.setHex(0x000000);
+          }
+          hoveredObject = sphere;
+          sphere.scale.setScalar(sphere.userData.baseScale * 1.35);
+          sphere.material.emissive.setHex(0x38bdf8);
+        }
+      } else {
+        if (hoveredObject) {
+          hoveredObject.scale.setScalar(hoveredObject.userData.baseScale);
+          hoveredObject.material.emissive.setHex(0x000000);
+          hoveredObject = null;
+        }
+      }
+
+      // 4. Billboard All In-Scene Panels to Face Active Camera (Constraint 4)
+      const currentCamera = renderer.xr.isPresenting ? renderer.xr.getCamera() : camera;
+      billboardPanels.forEach(panel => {
+        panel.quaternion.copy(currentCamera.quaternion);
+      });
+
+      // 5. Desktop Orbit Controls
+      if (!renderer.xr.isPresenting) {
+        controls.update();
+      }
+
+      renderer.render(scene, camera);
+    });
+  </script>
+</body>
+</html>
