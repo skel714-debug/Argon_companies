@@ -16,28 +16,34 @@
     }
     #desktop-ui {
       position: absolute;
-      top: 16px;
-      left: 16px;
+      top: 14px;
+      left: 14px;
       z-index: 10;
-      background: rgba(15, 23, 42, 0.85);
-      border: 1px solid rgba(255, 255, 255, 0.15);
-      padding: 16px 20px;
+      background: rgba(15, 23, 42, 0.90);
+      border: 1px solid rgba(56, 189, 248, 0.35);
+      padding: 14px 18px;
       border-radius: 10px;
-      backdrop-filter: blur(8px);
-      max-width: 380px;
+      max-width: 350px;
       box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+      pointer-events: none;
     }
     #desktop-ui h1 {
       margin: 0 0 6px 0;
-      font-size: 1.15rem;
+      font-size: 1.05rem;
       font-weight: 700;
       color: #38bdf8;
     }
     #desktop-ui p {
-      margin: 4px 0;
-      font-size: 0.82rem;
+      margin: 3px 0;
+      font-size: 0.8rem;
       line-height: 1.35;
-      color: #94a3b8;
+      color: #cbd5e1;
+    }
+    #desktop-ui .disclaimer {
+      margin-top: 6px;
+      color: #facc15;
+      font-size: 0.74rem;
+      font-style: italic;
     }
     #xr-bar {
       position: absolute;
@@ -51,7 +57,7 @@
     .btn-xr {
       background: #0284c7;
       color: #ffffff;
-      border: none;
+      border: 1px solid rgba(255,255,255,0.2);
       padding: 12px 22px;
       font-size: 0.95rem;
       font-weight: 600;
@@ -71,33 +77,45 @@
     .btn-ar:hover {
       background: #0f766e;
     }
-    #fallback-msg {
-      margin-top: 8px;
-      font-size: 0.78rem;
-      color: #e2e8f0;
-      font-style: italic;
+    .btn-reset {
+      background: #334155;
+      box-shadow: 0 4px 14px rgba(15, 23, 42, 0.4);
+    }
+    .btn-reset:hover {
+      background: #475569;
     }
   </style>
-  <script src="https://unpkg.com/three@0.160.0/build/three.min.js"></script>
-  <script src="https://unpkg.com/three@0.160.0/examples/js/controls/OrbitControls.js"></script>
+
+  <!-- Verified Three.js r160 ES Module Import Map -->
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+      }
+    }
+  </script>
 </head>
 <body>
   <div id="desktop-ui">
     <h1>Corporate Landscape (50 Companies)</h1>
-    <p><strong>X:</strong> Annual Revenue (Log USD)</p>
-    <p><strong>Y:</strong> Market Capitalisation (Log USD)</p>
-    <p><strong>Z:</strong> Employees (Log Headcount)</p>
-    <p><strong>Size:</strong> Age | <strong>Colour:</strong> Industry Sector</p>
-    <p id="fallback-msg">Desktop: Drag to orbit, scroll to zoom, click spheres to inspect. On Meta Quest 3: click Enter VR or Passthrough.</p>
+    <p><strong>X:</strong> Annual Revenue (Log USD) &nbsp;|&nbsp; <strong>Y:</strong> Market Cap (Log USD)</p>
+    <p><strong>Z:</strong> Employees (Log) &nbsp;|&nbsp; <strong>Size:</strong> Age &nbsp;|&nbsp; <strong>Colour:</strong> Sector</p>
+    <p id="fallback-msg"><strong>Desktop:</strong> Click any sphere or sector button in the 3D scene. Drag to orbit, scroll to zoom.</p>
+    <p class="disclaimer">*Figures are approximate & illustrative, not a citable source.</p>
   </div>
 
   <div id="xr-bar">
     <button id="btn-vr" class="btn-xr">Enter VR</button>
     <button id="btn-ar" class="btn-xr btn-ar">Enter Passthrough (AR)</button>
+    <button id="btn-reset" class="btn-xr btn-reset">Reset View</button>
   </div>
 
-  <script>
-    // --- 1. DATASET: 50 Real Companies, 5 Sectors (Strictly No Generated/Random Numbers) ---
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+    // --- 1. DATASET: 50 Real Named Companies, 5 Sectors (Zero Random/Generated Numbers) ---
     const SECTORS = {
       'Technology': { color: 0x00e5ff, hex: '#00e5ff', visible: true },
       'Retail':     { color: 0xff9100, hex: '#ff9100', visible: true },
@@ -106,7 +124,7 @@
       'Healthcare': { color: 0xff1744, hex: '#ff1744', visible: true }
     };
 
-    // Revenue ($B), Market Cap ($B), Employees (count), Age (years)
+    // Revenue ($B USD), Market Cap ($B USD), Employees (Headcount), Age (Years)
     const COMPANIES = [
       // Technology (10)
       { name: "Apple", sector: "Technology", rev: 385, cap: 3400, emp: 161000, age: 48 },
@@ -173,8 +191,8 @@
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0x060913);
 
-    const camera = new THREE.PerspectiveCamera(65, window.innerWidth / window.innerHeight, 0.05, 100);
-    camera.position.set(0, 1.45, 0.3);
+    const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.05, 100);
+    camera.position.set(0, 1.45, 0.45);
 
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -182,33 +200,32 @@
     renderer.xr.enabled = true;
     document.body.appendChild(renderer.domElement);
 
-    const controls = new THREE.OrbitControls(camera, renderer.domElement);
+    const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
-    controls.dampingFactor = 0.05;
-    controls.target.set(0, 1.25, -1.8);
+    controls.dampingFactor = 0.06;
+    controls.target.set(0, 1.32, -1.8);
+    controls.minDistance = 0.5;
+    controls.maxDistance = 5.0;
 
-    // Lighting
-    const ambLight = new THREE.AmbientLight(0xffffff, 0.9);
-    scene.add(ambLight);
-    const dirLight = new THREE.DirectionalLight(0xffffff, 1.2);
-    dirLight.position.set(3, 6, 2);
+    scene.add(new THREE.AmbientLight(0xffffff, 0.95));
+    const dirLight = new THREE.DirectionalLight(0xffffff, 1.3);
+    dirLight.position.set(2.5, 5, 3);
     scene.add(dirLight);
 
-    // Master container placed 1.8m in front of user at eye height
+    // Master container placed 1.8m in front of user at eye height (Constraint 6)
     const mainAnchor = new THREE.Group();
-    mainAnchor.position.set(0, 0.9, -1.8);
+    mainAnchor.position.set(0, 1.0, -1.8);
     scene.add(mainAnchor);
 
-    // Rotating plot core (User rotation affects this group)
+    // Rotating plot core (User wrist-twist rotates this group)
     const plotCore = new THREE.Group();
     mainAnchor.add(plotCore);
 
-    // Bounding plot dimensions (meters)
-    const BOX_W = 1.2;  // X: Revenue
-    const BOX_H = 0.85; // Y: Market Cap
-    const BOX_D = 1.2;  // Z: Employees
+    // Plot volume dimensions in meters (Fits cleanly in single FOV at 1.8m)
+    const BOX_W = 0.95; // X: Revenue
+    const BOX_H = 0.72; // Y: Market Cap
+    const BOX_D = 0.95; // Z: Employees
 
-    // Coordinate logarithmic ranges
     const MIN_LOG_REV = Math.log10(15);
     const MAX_LOG_REV = Math.log10(700);
     const MIN_LOG_CAP = Math.log10(50);
@@ -230,10 +247,10 @@
     }
     function mapRadius(age) {
       const norm = Math.min(Math.max((age - 10) / (230 - 10), 0), 1);
-      return 0.016 + norm * (0.042 - 0.016);
+      return 0.015 + norm * (0.038 - 0.015);
     }
 
-    // --- 3. HIGH-CONTRAST CANVAS TEXTURE GENERATOR (Strict depthTest: true) ---
+    // --- 3. HIGH-CONTRAST OPAQUE CANVAS PANELS (Constraints 4 & 9: depthTest: true) ---
     const billboardPanels = [];
 
     function makeTextTexture(lines, options = {}) {
@@ -244,23 +261,22 @@
       canvas.height = height;
       const ctx = canvas.getContext('2d');
 
-      // Solid opaque background for high contrast in passthrough mode
+      // Opaque dark backing for passthrough readability
       ctx.fillStyle = options.bgColor || '#0f172a';
       ctx.fillRect(0, 0, width, height);
 
-      // Border outline
       ctx.lineWidth = options.borderWidth || 4;
       ctx.strokeStyle = options.borderColor || '#38bdf8';
       ctx.strokeRect(4, 4, width - 8, height - 8);
 
-      let startY = options.startY || 45;
+      let startY = options.startY || 44;
       lines.forEach((l) => {
         ctx.fillStyle = l.color || '#f8fafc';
         ctx.font = l.font || 'bold 22px Arial, sans-serif';
         ctx.textAlign = l.align || 'center';
         const posX = l.align === 'left' ? 24 : (l.align === 'right' ? width - 24 : width / 2);
         ctx.fillText(l.text, posX, startY);
-        startY += (l.spacing || 34);
+        startY += (l.spacing || 32);
       });
 
       const texture = new THREE.CanvasTexture(canvas);
@@ -275,58 +291,65 @@
         depthTest: true
       });
       const geom = new THREE.PlaneGeometry(planeW, planeH);
-      const mesh = new THREE.Mesh(geom, mat);
-      return mesh;
+      return new THREE.Mesh(geom, mat);
     }
 
-    // --- 4. GRID, BOUNDS & DEPTH CUES ---
+    // --- 4. FLOOR GRID, AXES & NON-OVERLAPPING AXIS LABELS ---
     const gridFloor = new THREE.GridHelper(BOX_W, 6, 0x38bdf8, 0x1e293b);
     gridFloor.position.set(0, 0, 0);
     plotCore.add(gridFloor);
 
-    // Axis Line Segments
-    const axisMat = new THREE.LineBasicMaterial({ color: 0x64748b, linewidth: 2, depthTest: true });
+    // Three orthogonal axes meeting at origin corner (-BOX_W/2, 0, -BOX_D/2)
+    const axisMat = new THREE.LineBasicMaterial({ color: 0x94a3b8, depthTest: true });
     const axisGeom = new THREE.BufferGeometry().setFromPoints([
-      // Origin at (-BOX_W/2, 0, -BOX_D/2)
       new THREE.Vector3(-BOX_W/2, 0, -BOX_D/2), new THREE.Vector3(BOX_W/2, 0, -BOX_D/2), // X
       new THREE.Vector3(-BOX_W/2, 0, -BOX_D/2), new THREE.Vector3(-BOX_W/2, BOX_H, -BOX_D/2), // Y
       new THREE.Vector3(-BOX_W/2, 0, -BOX_D/2), new THREE.Vector3(-BOX_W/2, 0, BOX_D/2)  // Z
     ]);
-    const axisLines = new THREE.LineSegments(axisGeom, axisMat);
-    plotCore.add(axisLines);
+    plotCore.add(new THREE.LineSegments(axisGeom, axisMat));
 
-    // Non-overlapping Axis Labels with Opaque Backing
+    // Origin Corner Badge (Offset below origin so all 3 axis labels never overlap)
+    const originBadge = createPanelMesh(makeTextTexture([
+      { text: "ORIGIN: $15B Rev | $50B Cap | 9k Emp", color: "#94a3b8", font: "bold 18px Arial" }
+    ], { width: 380, height: 64, borderColor: "#475569", startY: 40 }), 0.28, 0.048);
+    originBadge.position.set(-BOX_W/2, -0.055, -BOX_D/2);
+    plotCore.add(originBadge);
+    billboardPanels.push(originBadge);
+
+    // X-Axis Label placed at far positive X end
     const labelX = createPanelMesh(makeTextTexture([
-      { text: "X: REVENUE (USD LOG)", color: "#38bdf8", font: "bold 24px Arial" },
-      { text: "Range: $18B → $648B", color: "#94a3b8", font: "18px Arial" }
-    ], { width: 340, height: 110 }), 0.34, 0.11);
-    labelX.position.set(BOX_W/2 + 0.16, 0.06, -BOX_D/2);
+      { text: "X: ANNUAL REVENUE (LOG)", color: "#38bdf8", font: "bold 22px Arial" },
+      { text: "$18B → $648B USD", color: "#cbd5e1", font: "18px Arial" }
+    ], { width: 340, height: 105 }), 0.28, 0.086);
+    labelX.position.set(BOX_W/2 + 0.14, 0.05, -BOX_D/2);
     plotCore.add(labelX);
     billboardPanels.push(labelX);
 
+    // Y-Axis Label placed above top of Y axis
     const labelY = createPanelMesh(makeTextTexture([
-      { text: "Y: MARKET VALUATION (USD LOG)", color: "#38bdf8", font: "bold 24px Arial" },
-      { text: "Range: $65B → $3.4T", color: "#94a3b8", font: "18px Arial" }
-    ], { width: 420, height: 110 }), 0.42, 0.11);
-    labelY.position.set(-BOX_W/2, BOX_H + 0.08, -BOX_D/2);
+      { text: "Y: MARKET CAP (LOG)", color: "#38bdf8", font: "bold 22px Arial" },
+      { text: "$65B → $3.4T USD", color: "#cbd5e1", font: "18px Arial" }
+    ], { width: 340, height: 105 }), 0.28, 0.086);
+    labelY.position.set(-BOX_W/2, BOX_H + 0.09, -BOX_D/2);
     plotCore.add(labelY);
     billboardPanels.push(labelY);
 
+    // Z-Axis Label placed at far positive Z end
     const labelZ = createPanelMesh(makeTextTexture([
-      { text: "Z: EMPLOYEES (LOG)", color: "#38bdf8", font: "bold 24px Arial" },
-      { text: "Range: 10k → 2.1M", color: "#94a3b8", font: "18px Arial" }
-    ], { width: 340, height: 110 }), 0.34, 0.11);
-    labelZ.position.set(-BOX_W/2 - 0.14, 0.06, BOX_D/2 + 0.1);
+      { text: "Z: WORKFORCE (LOG)", color: "#38bdf8", font: "bold 22px Arial" },
+      { text: "10k → 2.1M Employees", color: "#cbd5e1", font: "18px Arial" }
+    ], { width: 340, height: 105 }), 0.28, 0.086);
+    labelZ.position.set(-BOX_W/2 - 0.08, 0.05, BOX_D/2 + 0.12);
     plotCore.add(labelZ);
     billboardPanels.push(labelZ);
 
-    // --- 5. ENTERPRISE DATA POINTS & ENLARGED COLLIDERS ---
+    // --- 5. DATA SPHERES, VERTICAL DROP LINES & FORGIVING COLLIDERS ---
     const interactiveColliders = [];
     const sphereMeshes = [];
-    const stemLines = [];
+    const stemObjects = [];
 
-    const sphereGeom = new THREE.SphereGeometry(1, 18, 14);
-    const discGeom = new THREE.RingGeometry(0.005, 0.016, 16);
+    const sphereGeom = new THREE.SphereGeometry(1, 20, 16);
+    const discGeom = new THREE.RingGeometry(0.004, 0.013, 16);
     discGeom.rotateX(-Math.PI / 2);
 
     COMPANIES.forEach((comp, idx) => {
@@ -336,21 +359,20 @@
       const rad = mapRadius(comp.age);
       const secConf = SECTORS[comp.sector];
 
-      // Visual Sphere
       const sphereMat = new THREE.MeshStandardMaterial({
         color: secConf.color,
-        roughness: 0.35,
-        metalness: 0.2,
+        roughness: 0.3,
+        metalness: 0.15,
         depthTest: true
       });
       const sphere = new THREE.Mesh(sphereGeom, sphereMat);
-      sphere.scale.set(rad, rad, rad);
+      sphere.scale.setScalar(rad);
       sphere.position.set(posX, posY, posZ);
       sphere.userData = { company: comp, baseScale: rad, index: idx };
       plotCore.add(sphere);
       sphereMeshes.push(sphere);
 
-      // Depth Cue: Drop line from point to floor
+      // Depth Cue: Drop line from sphere to floor grid (Constraint 5)
       const stemGeom = new THREE.BufferGeometry().setFromPoints([
         new THREE.Vector3(posX, posY, posZ),
         new THREE.Vector3(posX, 0, posZ)
@@ -358,15 +380,15 @@
       const stemMat = new THREE.LineBasicMaterial({
         color: secConf.color,
         transparent: true,
-        opacity: 0.35,
+        opacity: 0.4,
         depthTest: true
       });
       const stem = new THREE.Line(stemGeom, stemMat);
       stem.userData = { sector: comp.sector };
       plotCore.add(stem);
-      stemLines.push(stem);
+      stemObjects.push(stem);
 
-      // Depth Cue: Base disc on ground
+      // Floor anchor ring
       const discMat = new THREE.MeshBasicMaterial({
         color: secConf.color,
         side: THREE.DoubleSide,
@@ -376,95 +398,118 @@
       disc.position.set(posX, 0.001, posZ);
       disc.userData = { sector: comp.sector };
       plotCore.add(disc);
-      stemLines.push(disc);
+      stemObjects.push(disc);
 
-      // Forgiving Pointing: Enlarged invisible collider
-      const colRadius = Math.max(rad * 2.0, 0.065);
+      // Forgiving Pointing: Enlarged invisible collider (Constraint 7)
+      const colRadius = Math.max(rad * 2.1, 0.048);
       const colGeom = new THREE.SphereGeometry(colRadius, 10, 8);
-      const colMat = new THREE.MeshBasicMaterial({
-        visible: false,
-        depthTest: true
-      });
+      const colMat = new THREE.MeshBasicMaterial({ visible: false, depthTest: true });
       const collider = new THREE.Mesh(colGeom, colMat);
       collider.position.set(posX, posY, posZ);
-      collider.userData = { targetSphere: sphere, type: 'company', company: comp };
+      collider.userData = {
+        type: 'company',
+        targetSphere: sphere,
+        company: comp,
+        sector: comp.sector,
+        enabled: true
+      };
       plotCore.add(collider);
       interactiveColliders.push(collider);
     });
 
-    // --- 6. IN-SCENE UI PANELS (TITLE, FIRST-TIMER INSTRUCTION, DISCLAIMER, EXIT) ---
-    // Title & Disclaimer Banner
+    // --- 6. IN-SCENE UI PANELS (TITLE, FIRST-TIMER INSTRUCTION, EXIT VR) ---
+    // Header Banner (Constraint 2)
     const titleTex = makeTextTexture([
-      { text: "GLOBAL ENTERPRISE 3D SCATTER PLOT", color: "#38bdf8", font: "bold 26px Arial" },
-      { text: "X: Revenue (Log)  |  Y: Market Cap (Log)  |  Z: Workforce (Log)  |  Size: Age", color: "#e2e8f0", font: "18px Arial" },
-      { text: "*Illustrative & approximate corporate metrics. Not a citable financial source.", color: "#facc15", font: "italic 16px Arial" }
-    ], { width: 760, height: 160 });
-    const titlePanel = createPanelMesh(titleTex, 1.25, 0.28);
-    titlePanel.position.set(0, BOX_H + 0.38, 0);
+      { text: "50 GLOBAL ENTERPRISES — 3D SCATTER PLOT", color: "#38bdf8", font: "bold 25px Arial", startY: 40 },
+      { text: "X: Revenue (Log)  |  Y: Market Cap (Log)  |  Z: Employees (Log)  |  Size: Age", color: "#f1f5f9", font: "18px Arial", spacing: 30 },
+      { text: "*Approximate & illustrative figures only — not a citable financial source.", color: "#facc15", font: "italic 16px Arial", spacing: 28 }
+    ], { width: 760, height: 145, startY: 40 });
+    const titlePanel = createPanelMesh(titleTex, 1.05, 0.20);
+    titlePanel.position.set(0, BOX_H + 0.28, 0);
     mainAnchor.add(titlePanel);
     billboardPanels.push(titlePanel);
 
-    // First-Timer Instruction (Constraint 3)
+    // First-Timer Arrival Instruction (Constraint 3)
     const instructTex = makeTextTexture([
-      { text: "Point laser at any sphere & pull trigger to inspect.", color: "#38bdf8", font: "bold 23px Arial" },
-      { text: "Pull trigger on empty space to rotate the plot. Click sectors to filter.", color: "#94a3b8", font: "18px Arial" }
-    ], { width: 680, height: 120 });
-    const instructPanel = createPanelMesh(instructTex, 1.1, 0.2);
-    instructPanel.position.set(0, -0.16, 0.55);
+      { text: "Point at a sphere & pull trigger to inspect; grab empty space & twist wrist to rotate.", color: "#38bdf8", font: "bold 19px Arial" },
+      { text: "Point at any sector in the left legend and pull trigger to hide or show it.", color: "#cbd5e1", font: "17px Arial" }
+    ], { width: 780, height: 110, startY: 42 });
+    const instructPanel = createPanelMesh(instructTex, 1.02, 0.145);
+    instructPanel.position.set(0, -0.16, 0.35);
     mainAnchor.add(instructPanel);
     billboardPanels.push(instructPanel);
 
-    // In-Scene Exit VR Button (Constraint 1)
+    // In-Scene Exit VR Panel (Constraint 1)
     const exitTex = makeTextTexture([
       { text: "✕  EXIT VR SESSION", color: "#ffffff", font: "bold 26px Arial" }
-    ], { width: 340, height: 110, bgColor: "#dc2626", borderColor: "#fca5a5" });
-    const exitPanel = createPanelMesh(exitTex, 0.35, 0.11);
-    exitPanel.position.set(BOX_W/2 + 0.24, BOX_H + 0.36, 0);
-    exitPanel.userData = { type: 'exit-vr' };
+    ], { width: 340, height: 100, bgColor: "#b91c1c", borderColor: "#fca5a5", startY: 60 });
+    const exitPanel = createPanelMesh(exitTex, 0.30, 0.09);
+    exitPanel.position.set(BOX_W/2 + 0.38, BOX_H + 0.28, 0);
+    exitPanel.userData = { type: 'exit-vr', enabled: true, baseScale: 1 };
     mainAnchor.add(exitPanel);
     billboardPanels.push(exitPanel);
     interactiveColliders.push(exitPanel);
 
-    // --- 7. IN-SCENE INTERACTIVE LEGEND (SECTOR FILTERING) ---
+    // --- 7. IN-SCENE INTERACTIVE LEGEND (SECTOR SHOW/HIDE) ---
     const legendGroup = new THREE.Group();
-    legendGroup.position.set(-BOX_W/2 - 0.32, BOX_H * 0.45, 0);
+    legendGroup.position.set(-BOX_W/2 - 0.34, BOX_H * 0.48, 0);
     mainAnchor.add(legendGroup);
 
-    const legendTitleTex = makeTextTexture([
-      { text: "SECTORS (FILTER)", color: "#38bdf8", font: "bold 22px Arial" }
-    ], { width: 320, height: 70 });
-    const legendTitle = createPanelMesh(legendTitleTex, 0.36, 0.08);
-    legendTitle.position.set(0, 0.22, 0);
-    legendGroup.add(legendTitle);
-    billboardPanels.push(legendTitle);
+    const legendHeader = createPanelMesh(makeTextTexture([
+      { text: "FILTER SECTORS", color: "#38bdf8", font: "bold 22px Arial" }
+    ], { width: 320, height: 70, startY: 44 }), 0.30, 0.065);
+    legendHeader.position.set(0, 0.20, 0);
+    legendGroup.add(legendHeader);
+    billboardPanels.push(legendHeader);
 
     const legendButtonMeshes = [];
-    let lIdx = 0;
+    let sIdx = 0;
     for (const [sectorName, sConf] of Object.entries(SECTORS)) {
       const btnTex = makeTextTexture([
         { text: `● ${sectorName.toUpperCase()}`, color: sConf.hex, font: "bold 22px Arial" }
-      ], { width: 320, height: 75, borderColor: sConf.hex });
-      const btnMesh = createPanelMesh(btnTex, 0.36, 0.085);
-      btnMesh.position.set(0, 0.12 - (lIdx * 0.105), 0);
-      btnMesh.userData = { type: 'legend', sector: sectorName, active: true, texData: btnTex, conf: sConf };
+      ], { width: 320, height: 75, borderColor: sConf.hex, startY: 46 });
+      const btnMesh = createPanelMesh(btnTex, 0.30, 0.07);
+      btnMesh.position.set(0, 0.11 - (sIdx * 0.085), 0);
+      btnMesh.userData = {
+        type: 'legend',
+        sector: sectorName,
+        active: true,
+        texData: btnTex,
+        conf: sConf,
+        enabled: true,
+        baseScale: 1
+      };
       legendGroup.add(btnMesh);
       legendButtonMeshes.push(btnMesh);
       interactiveColliders.push(btnMesh);
       billboardPanels.push(btnMesh);
-      lIdx++;
+      sIdx++;
     }
 
-    // --- 8. FLOATING INSPECTION CARD ---
+    // --- 8. COMPANY DETAILS READABLE PANEL ---
     const detailsCanvasObj = makeTextTexture([
-      { text: "SELECT A COMPANY", color: "#38bdf8", font: "bold 24px Arial" },
-      { text: "Laser point and pull trigger on any sphere", color: "#94a3b8", font: "18px Arial" }
-    ], { width: 600, height: 380, borderColor: "#38bdf8" });
-    const detailsPanel = createPanelMesh(detailsCanvasObj, 0.65, 0.42);
-    detailsPanel.position.set(BOX_W/2 + 0.45, BOX_H * 0.45, 0);
+      { text: "COMPANY INSPECTOR", color: "#38bdf8", font: "bold 24px Arial" },
+      { text: "Point & trigger (or click)", color: "#cbd5e1", font: "19px Arial" },
+      { text: "any sphere in the plot", color: "#cbd5e1", font: "19px Arial" }
+    ], { width: 560, height: 360, borderColor: "#38bdf8", startY: 130 });
+    const detailsPanel = createPanelMesh(detailsCanvasObj, 0.52, 0.34);
+    detailsPanel.position.set(BOX_W/2 + 0.38, BOX_H * 0.45, 0);
     mainAnchor.add(detailsPanel);
     billboardPanels.push(detailsPanel);
 
-    function updateDetailsCard(company) {
+    let selectedSphere = null;
+
+    function updateDetailsCard(company, sphereMesh) {
+      if (selectedSphere && selectedSphere !== sphereMesh) {
+        selectedSphere.material.emissive.setHex(0x000000);
+        selectedSphere.scale.setScalar(selectedSphere.userData.baseScale);
+      }
+      selectedSphere = sphereMesh;
+      if (selectedSphere) {
+        selectedSphere.material.emissive.setHex(0x22d3ee);
+        selectedSphere.scale.setScalar(selectedSphere.userData.baseScale * 1.35);
+      }
+
       const ctx = detailsCanvasObj.ctx;
       const w = detailsCanvasObj.width;
       const h = detailsCanvasObj.height;
@@ -472,66 +517,57 @@
 
       ctx.fillStyle = '#0f172a';
       ctx.fillRect(0, 0, w, h);
-      ctx.lineWidth = 5;
+      ctx.lineWidth = 6;
       ctx.strokeStyle = sConf.hex;
       ctx.strokeRect(4, 4, w - 8, h - 8);
 
-      // Header Banner
       ctx.fillStyle = sConf.hex;
       ctx.font = 'bold 28px Arial, sans-serif';
       ctx.textAlign = 'left';
-      ctx.fillText(company.name.toUpperCase(), 24, 44);
+      ctx.fillText(company.name.toUpperCase(), 24, 46);
 
-      ctx.fillStyle = '#94a3b8';
+      ctx.fillStyle = '#cbd5e1';
       ctx.font = 'bold 18px Arial, sans-serif';
       ctx.fillText(`SECTOR: ${company.sector.toUpperCase()}`, 24, 76);
 
-      // Divider
       ctx.strokeStyle = '#334155';
       ctx.lineWidth = 2;
       ctx.beginPath();
-      ctx.moveTo(24, 94);
-      ctx.lineTo(w - 24, 94);
+      ctx.moveTo(24, 92);
+      ctx.lineTo(w - 24, 92);
       ctx.stroke();
 
-      // Metrics Table
-      ctx.font = '20px Arial, sans-serif';
-      ctx.fillStyle = '#f8fafc';
-      ctx.fillText(`• Market Valuation:`, 24, 134);
-      ctx.fillStyle = '#38bdf8';
-      ctx.fillText(`$${company.cap.toLocaleString()} Billion USD`, 260, 134);
+      const rows = [
+        ["Market Cap:", `$${company.cap.toLocaleString()} Billion USD`],
+        ["Annual Revenue:", `$${company.rev.toLocaleString()} Billion USD`],
+        ["Employees:", `${company.emp.toLocaleString()} staff`],
+        ["Company Age:", `${company.age} years`]
+      ];
 
-      ctx.fillStyle = '#f8fafc';
-      ctx.fillText(`• Annual Revenue:`, 24, 180);
-      ctx.fillStyle = '#38bdf8';
-      ctx.fillText(`$${company.rev.toLocaleString()} Billion USD`, 260, 180);
+      rows.forEach((r, idx) => {
+        const y = 132 + idx * 44;
+        ctx.fillStyle = '#94a3b8';
+        ctx.font = '20px Arial, sans-serif';
+        ctx.fillText(r[0], 24, y);
+        ctx.fillStyle = '#f8fafc';
+        ctx.font = 'bold 21px Arial, sans-serif';
+        ctx.fillText(r[1], 210, y);
+      });
 
-      ctx.fillStyle = '#f8fafc';
-      ctx.fillText(`• Global Workforce:`, 24, 226);
-      ctx.fillStyle = '#38bdf8';
-      ctx.fillText(`${company.emp.toLocaleString()} employees`, 260, 226);
-
-      ctx.fillStyle = '#f8fafc';
-      ctx.fillText(`• Enterprise Age:`, 24, 272);
-      ctx.fillStyle = '#38bdf8';
-      ctx.fillText(`${company.age} years`, 260, 272);
-
-      // Footer note
       ctx.fillStyle = '#facc15';
-      ctx.font = 'italic 16px Arial, sans-serif';
-      ctx.fillText(`*Illustrative approximate figures for 3D spatial comparison`, 24, 335);
+      ctx.font = 'italic 15px Arial, sans-serif';
+      ctx.fillText('*Approximate figures for illustrative 3D comparison', 24, 332);
 
       detailsCanvasObj.texture.needsUpdate = true;
-      instructPanel.visible = false; // Hide instruction once user knows what they are doing
+      instructPanel.visible = false;
     }
 
-    // --- 9. SECTOR TOGGLE LOGIC ---
+    // --- 9. SECTOR VISIBILITY TOGGLE ---
     function toggleSector(sectorName, btnMesh) {
       const active = !SECTORS[sectorName].visible;
       SECTORS[sectorName].visible = active;
       btnMesh.userData.active = active;
 
-      // Update button visual
       const ctx = btnMesh.userData.texData.ctx;
       const w = btnMesh.userData.texData.width;
       const h = btnMesh.userData.texData.height;
@@ -544,27 +580,25 @@
       ctx.strokeRect(4, 4, w - 8, h - 8);
 
       ctx.fillStyle = active ? conf.hex : '#64748b';
-      ctx.font = 'bold 22px Arial, sans-serif';
+      ctx.font = 'bold 21px Arial, sans-serif';
       ctx.textAlign = 'center';
-      const label = active ? `● ${sectorName.toUpperCase()}` : `○ ${sectorName.toUpperCase()} (HIDDEN)`;
-      ctx.fillText(label, w / 2, 45);
+      ctx.fillText(active ? `● ${sectorName.toUpperCase()}` : `○ ${sectorName.toUpperCase()} (OFF)`, w / 2, 46);
       btnMesh.userData.texData.texture.needsUpdate = true;
 
-      // Update sphere visibility
       sphereMeshes.forEach(s => {
-        if (s.userData.company.sector === sectorName) {
-          s.visible = active;
-        }
+        if (s.userData.company.sector === sectorName) s.visible = active;
       });
-      // Update drop lines & discs
-      stemLines.forEach(l => {
-        if (l.userData.sector === sectorName) {
-          l.visible = active;
+      stemObjects.forEach(st => {
+        if (st.userData.sector === sectorName) st.visible = active;
+      });
+      interactiveColliders.forEach(col => {
+        if (col.userData.type === 'company' && col.userData.sector === sectorName) {
+          col.userData.enabled = active;
         }
       });
     }
 
-    // --- 10. RECOVERY / IDLE SYSTEM (45-Second Inactivity Reset) ---
+    // --- 10. IDLE RECOVERY SYSTEM (Constraint 8: 45-Second Reset) ---
     let lastActivityTime = Date.now();
     let hasModifiedState = false;
 
@@ -574,15 +608,18 @@
     }
 
     function resetToCleanState() {
-      // 1. Restore all sectors
       legendButtonMeshes.forEach(btn => {
-        if (!btn.userData.active) {
-          toggleSector(btn.userData.sector, btn);
-        }
+        if (!btn.userData.active) toggleSector(btn.userData.sector, btn);
       });
-      // 2. Reset plot rotation
-      plotCore.rotation.y = 0;
-      // 3. Reset details panel
+
+      plotCore.rotation.set(0, 0, 0);
+
+      if (selectedSphere) {
+        selectedSphere.material.emissive.setHex(0x000000);
+        selectedSphere.scale.setScalar(selectedSphere.userData.baseScale);
+        selectedSphere = null;
+      }
+
       const ctx = detailsCanvasObj.ctx;
       const w = detailsCanvasObj.width;
       const h = detailsCanvasObj.height;
@@ -594,156 +631,177 @@
       ctx.fillStyle = '#38bdf8';
       ctx.font = 'bold 24px Arial, sans-serif';
       ctx.textAlign = 'center';
-      ctx.fillText("SELECT A COMPANY", w / 2, 160);
-      ctx.fillStyle = '#94a3b8';
-      ctx.font = '18px Arial, sans-serif';
-      ctx.fillText("Laser point and pull trigger on any sphere", w / 2, 210);
+      ctx.fillText("COMPANY INSPECTOR", w / 2, 140);
+      ctx.fillStyle = '#cbd5e1';
+      ctx.font = '19px Arial, sans-serif';
+      ctx.fillText("Point & trigger (or click)", w / 2, 185);
+      ctx.fillText("any sphere in the plot", w / 2, 215);
       detailsCanvasObj.texture.needsUpdate = true;
 
-      // 4. Show instruction panel again
       instructPanel.visible = true;
+      camera.position.set(0, 1.45, 0.45);
+      controls.target.set(0, 1.32, -1.8);
+      controls.update();
       hasModifiedState = false;
     }
 
-    // --- 11. WEBXR CONTROLLERS, LASER POINTERS & GRAB ROTATION ---
+    document.getElementById('btn-reset').addEventListener('click', resetToCleanState);
+
+    // --- 11. WEBXR CONTROLLERS, DUAL-CONTROLLER HOVER & WRIST-TWIST ROTATION ---
     const raycaster = new THREE.Raycaster();
     const tempMatrix = new THREE.Matrix4();
-    let hoveredObject = null;
 
-    // Laser Pointer Mesh
-    function buildControllerPointer() {
+    function createControllerRig(index) {
+      const ctrl = renderer.xr.getController(index);
       const lineGeom = new THREE.BufferGeometry().setFromPoints([
         new THREE.Vector3(0, 0, 0),
-        new THREE.Vector3(0, 0, -2.5)
+        new THREE.Vector3(0, 0, -1)
       ]);
       const lineMat = new THREE.LineBasicMaterial({
         color: 0x38bdf8,
         transparent: true,
-        opacity: 0.8,
+        opacity: 0.85,
         depthTest: true
       });
-      const laser = new THREE.Line(lineGeom, lineMat);
+      const laserLine = new THREE.Line(lineGeom, lineMat);
+      laserLine.scale.z = 2.5;
 
-      // Pointer dot
-      const dotGeom = new THREE.SphereGeometry(0.008, 8, 8);
-      const dotMat = new THREE.MeshBasicMaterial({ color: 0x00e5ff, depthTest: true });
-      const dot = new THREE.Mesh(dotGeom, dotMat);
-      dot.position.z = -2.5;
-      laser.add(dot);
-      return laser;
+      const tipGeom = new THREE.SphereGeometry(0.007, 8, 8);
+      const tipMat = new THREE.MeshBasicMaterial({ color: 0x00e5ff, depthTest: true });
+      const tipMesh = new THREE.Mesh(tipGeom, tipMat);
+      tipMesh.position.z = -2.5;
+
+      ctrl.add(laserLine);
+      ctrl.add(tipMesh);
+      ctrl.userData = { laserLine, tipMesh };
+      scene.add(ctrl);
+      return ctrl;
     }
 
-    const controller0 = renderer.xr.getController(0);
-    const controller1 = renderer.xr.getController(1);
-    [controller0, controller1].forEach(ctrl => {
-      ctrl.add(buildControllerPointer());
-      scene.add(ctrl);
-    });
+    const controllers = [createControllerRig(0), createControllerRig(1)];
 
-    // Twist / Grab state in VR
+    // Wrist-twist rotation state (Issue 4 Fix: Quaternion orientation delta)
     let activeGrabController = null;
-    let grabInitialHandAngle = 0;
-    let grabInitialPlotAngle = 0;
+    const grabStartQuatInverse = new THREE.Quaternion();
+    const currentCtrlQuat = new THREE.Quaternion();
+    const deltaTwistQuat = new THREE.Quaternion();
+    const twistEuler = new THREE.Euler();
+    let grabInitialPlotRotation = 0;
 
-    function handleTriggerDown(event) {
+    function getEnabledHits() {
+      const enabledTargets = interactiveColliders.filter(c => c.userData.enabled !== false);
+      return raycaster.intersectObjects(enabledTargets, false);
+    }
+
+    function executeHitAction(hitObj) {
+      if (hitObj.userData.type === 'company') {
+        updateDetailsCard(hitObj.userData.company, hitObj.userData.targetSphere);
+      } else if (hitObj.userData.type === 'legend') {
+        toggleSector(hitObj.userData.sector, hitObj);
+      } else if (hitObj.userData.type === 'exit-vr') {
+        const session = renderer.xr.getSession();
+        if (session) session.end();
+      }
+    }
+
+    function onControllerSelectStart(event) {
       registerActivity();
       const ctrl = event.target;
       tempMatrix.identity().extractRotation(ctrl.matrixWorld);
       raycaster.ray.origin.setFromMatrixPosition(ctrl.matrixWorld);
       raycaster.ray.direction.set(0, 0, -1).applyMatrix4(tempMatrix);
 
-      const hits = raycaster.intersectObjects(interactiveColliders, false);
+      const hits = getEnabledHits();
       if (hits.length > 0) {
-        const hit = hits[0].object;
-        if (hit.userData.type === 'company') {
-          updateDetailsCard(hit.userData.company);
-        } else if (hit.userData.type === 'legend') {
-          toggleSector(hit.userData.sector, hit);
-        } else if (hit.userData.type === 'exit-vr') {
-          const session = renderer.xr.getSession();
-          if (session) session.end();
-        }
+        executeHitAction(hits[0].object);
       } else {
-        // Grab empty space to rotate
+        // Grab empty space and twist wrist in place to rotate the plot
         activeGrabController = ctrl;
-        const handPos = ctrl.position;
-        grabInitialHandAngle = Math.atan2(handPos.x - mainAnchor.position.x, handPos.z - mainAnchor.position.z);
-        grabInitialPlotAngle = plotCore.rotation.y;
+        ctrl.getWorldQuaternion(grabStartQuatInverse).invert();
+        grabInitialPlotRotation = plotCore.rotation.y;
       }
     }
 
-    function handleTriggerUp(event) {
+    function onControllerSelectEnd(event) {
       if (activeGrabController === event.target) {
         activeGrabController = null;
       }
     }
 
-    controller0.addEventListener('selectstart', handleTriggerDown);
-    controller0.addEventListener('selectend', handleTriggerUp);
-    controller1.addEventListener('selectstart', handleTriggerDown);
-    controller1.addEventListener('selectend', handleTriggerUp);
+    controllers.forEach(c => {
+      c.addEventListener('selectstart', onControllerSelectStart);
+      c.addEventListener('selectend', onControllerSelectEnd);
+    });
 
-    // Desktop Raycasting & Interactions
+    // --- 12. DESKTOP MOUSE INTERACTION ---
     const mouse = new THREE.Vector2(-999, -999);
-    window.addEventListener('mousemove', (e) => {
+    let downPos = { x: 0, y: 0 };
+
+    window.addEventListener('pointermove', (e) => {
       registerActivity();
       mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
       mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
     });
 
-    window.addEventListener('click', () => {
+    window.addEventListener('pointerdown', (e) => {
       registerActivity();
+      downPos.x = e.clientX;
+      downPos.y = e.clientY;
+    });
+
+    window.addEventListener('pointerup', (e) => {
+      if (e.target.tagName === 'BUTTON') return;
+      const moveDist = Math.hypot(e.clientX - downPos.x, e.clientY - downPos.y);
+      if (moveDist > 6) return;
+
+      mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+      mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
       raycaster.setFromCamera(mouse, camera);
-      const hits = raycaster.intersectObjects(interactiveColliders, false);
+
+      const hits = getEnabledHits();
       if (hits.length > 0) {
-        const hit = hits[0].object;
-        if (hit.userData.type === 'company') {
-          updateDetailsCard(hit.userData.company);
-        } else if (hit.userData.type === 'legend') {
-          toggleSector(hit.userData.sector, hit);
-        } else if (hit.userData.type === 'exit-vr') {
-          const session = renderer.xr.getSession();
-          if (session) session.end();
-        }
+        executeHitAction(hits[0].object);
       }
     });
 
-    // --- 12. WEBXR LAUNCH HANDLERS (VR & PASSTHROUGH AR) ---
+    // --- 13. WEBXR SESSION MANAGEMENT (VR & PASSTHROUGH MIXED REALITY) ---
     const btnVR = document.getElementById('btn-vr');
     const btnAR = document.getElementById('btn-ar');
+    let xrHeightCalibrated = false;
 
     if ('xr' in navigator) {
-      navigator.xr.isSessionSupported('immersive-vr').then(supported => {
-        if (!supported) btnVR.style.display = 'none';
+      navigator.xr.isSessionSupported('immersive-vr').then(ok => {
+        if (!ok) btnVR.style.display = 'none';
       });
-      navigator.xr.isSessionSupported('immersive-ar').then(supported => {
-        if (!supported) btnAR.style.display = 'none';
+      navigator.xr.isSessionSupported('immersive-ar').then(ok => {
+        if (!ok) btnAR.style.display = 'none';
       });
     } else {
       btnVR.style.display = 'none';
       btnAR.style.display = 'none';
-      document.getElementById('fallback-msg').textContent = "WebXR not supported on this browser. Use mouse to orbit and inspect on desktop.";
     }
 
-    async function startXRSession(mode) {
-      const sessionInit = { optionalFeatures: ['local-floor', 'bounded-floor', 'hand-tracking'] };
+    async function launchXR(mode) {
       try {
-        const session = await navigator.xr.requestSession(mode, sessionInit);
+        const session = await navigator.xr.requestSession(mode, {
+          optionalFeatures: ['local-floor', 'bounded-floor', 'hand-tracking']
+        });
         renderer.xr.setSession(session);
+        xrHeightCalibrated = false;
         if (mode === 'immersive-ar') {
-          scene.background = null; // Passthrough transparency
+          scene.background = null;
         }
         session.addEventListener('end', () => {
           scene.background = new THREE.Color(0x060913);
+          mainAnchor.position.set(0, 1.0, -1.8);
         });
       } catch (err) {
-        console.error("Failed to start WebXR session: ", err);
-        alert("WebXR session could not start: " + err.message);
+        alert('Could not start WebXR session: ' + err.message);
       }
     }
 
-    btnVR.addEventListener('click', () => startXRSession('immersive-vr'));
-    btnAR.addEventListener('click', () => startXRSession('immersive-ar'));
+    btnVR.addEventListener('click', () => launchXR('immersive-vr'));
+    btnAR.addEventListener('click', () => launchXR('immersive-ar'));
 
     window.addEventListener('resize', () => {
       camera.aspect = window.innerWidth / window.innerHeight;
@@ -751,64 +809,134 @@
       renderer.setSize(window.innerWidth, window.innerHeight);
     });
 
-    // --- 13. MAIN ANIMATION LOOP (QUEST 3 72/90Hz OPTIMIZED) ---
+    // --- 14. RENDER LOOP (QUEST 3 OPTIMIZED) ---
+    const camWorldPos = new THREE.Vector3();
+    const panelWorldPos = new THREE.Vector3();
+    const parentWorldQuat = new THREE.Quaternion();
+    const targetWorldQuat = new THREE.Quaternion();
+    const lookMatrix = new THREE.Matrix4();
+    const worldUp = new THREE.Vector3(0, 1, 0);
+
+    const previouslyHoveredSpheres = new Set();
+    const currentlyHoveredSpheres = new Set();
+    const previouslyHoveredPanels = new Set();
+    const currentlyHoveredPanels = new Set();
+
     renderer.setAnimationLoop(() => {
-      // 1. Idle Recovery Check (45 Seconds)
+      // 1. 45-Second Idle Recovery Check (Constraint 8)
       if (hasModifiedState && Date.now() - lastActivityTime > 45000) {
         resetToCleanState();
       }
 
-      // 2. Controller Twist / Grab Rotation
-      if (activeGrabController) {
-        const handPos = activeGrabController.position;
-        const currentAngle = Math.atan2(handPos.x - mainAnchor.position.x, handPos.z - mainAnchor.position.z);
-        const delta = currentAngle - grabInitialHandAngle;
-        plotCore.rotation.y = grabInitialPlotAngle + delta * 1.5;
+      // 2. Calibrate eye-height placement on first XR frame (Constraint 6)
+      if (renderer.xr.isPresenting) {
+        const xrCam = renderer.xr.getCamera();
+        xrCam.getWorldPosition(camWorldPos);
+        if (!xrHeightCalibrated && camWorldPos.y > 0.2) {
+          mainAnchor.position.y = Math.max(0.55, camWorldPos.y - BOX_H * 0.55);
+          xrHeightCalibrated = true;
+        }
+      } else {
+        camera.getWorldPosition(camWorldPos);
       }
 
-      // 3. Forgiving Hover Detection (VR Controller 0/1 or Desktop Mouse)
-      let activeHit = null;
+      // 3. Wrist-Twist Rotation in VR (Issue 4 Fix: Responds to in-place wrist yaw & roll)
+      if (activeGrabController) {
+        activeGrabController.getWorldQuaternion(currentCtrlQuat);
+        deltaTwistQuat.multiplyQuaternions(currentCtrlQuat, grabStartQuatInverse);
+        twistEuler.setFromQuaternion(deltaTwistQuat, 'YXZ');
+        const twistDelta = twistEuler.y - twistEuler.z;
+        plotCore.rotation.y = grabInitialPlotRotation + twistDelta * 1.8;
+      }
+
+      // 4. Dual-Controller & Desktop Hover Highlighting (Issue 2 Fix)
+      currentlyHoveredSpheres.clear();
+      currentlyHoveredPanels.clear();
+
       if (renderer.xr.isPresenting) {
-        // Use primary active controller for hover ray
-        const ctrl = controller0;
-        tempMatrix.identity().extractRotation(ctrl.matrixWorld);
-        raycaster.ray.origin.setFromMatrixPosition(ctrl.matrixWorld);
-        raycaster.ray.direction.set(0, 0, -1).applyMatrix4(tempMatrix);
-        const hits = raycaster.intersectObjects(interactiveColliders, false);
-        if (hits.length > 0) activeHit = hits[0].object;
+        controllers.forEach(ctrl => {
+          tempMatrix.identity().extractRotation(ctrl.matrixWorld);
+          raycaster.ray.origin.setFromMatrixPosition(ctrl.matrixWorld);
+          raycaster.ray.direction.set(0, 0, -1).applyMatrix4(tempMatrix);
+          const hits = getEnabledHits();
+          if (hits.length > 0) {
+            const hit = hits[0];
+            ctrl.userData.laserLine.scale.z = hit.distance;
+            ctrl.userData.tipMesh.position.z = -hit.distance;
+            if (hit.object.userData.type === 'company') {
+              currentlyHoveredSpheres.add(hit.object.userData.targetSphere);
+            } else {
+              currentlyHoveredPanels.add(hit.object);
+            }
+          } else {
+            ctrl.userData.laserLine.scale.z = 2.5;
+            ctrl.userData.tipMesh.position.z = -2.5;
+          }
+        });
       } else {
         raycaster.setFromCamera(mouse, camera);
-        const hits = raycaster.intersectObjects(interactiveColliders, false);
-        if (hits.length > 0) activeHit = hits[0].object;
-      }
-
-      // Apply Hover Highlight Before Selection (Constraint 7)
-      if (activeHit && activeHit.userData.type === 'company') {
-        const sphere = activeHit.userData.targetSphere;
-        if (hoveredObject !== sphere) {
-          if (hoveredObject) {
-            hoveredObject.scale.setScalar(hoveredObject.userData.baseScale);
-            hoveredObject.material.emissive.setHex(0x000000);
+        const hits = getEnabledHits();
+        if (hits.length > 0) {
+          const hitObj = hits[0].object;
+          if (hitObj.userData.type === 'company') {
+            currentlyHoveredSpheres.add(hitObj.userData.targetSphere);
+          } else {
+            currentlyHoveredPanels.add(hitObj);
           }
-          hoveredObject = sphere;
-          sphere.scale.setScalar(sphere.userData.baseScale * 1.35);
-          sphere.material.emissive.setHex(0x38bdf8);
-        }
-      } else {
-        if (hoveredObject) {
-          hoveredObject.scale.setScalar(hoveredObject.userData.baseScale);
-          hoveredObject.material.emissive.setHex(0x000000);
-          hoveredObject = null;
+          document.body.style.cursor = 'pointer';
+        } else {
+          document.body.style.cursor = 'default';
         }
       }
 
-      // 4. Billboard All In-Scene Panels to Face Active Camera (Constraint 4)
-      const currentCamera = renderer.xr.isPresenting ? renderer.xr.getCamera() : camera;
-      billboardPanels.forEach(panel => {
-        panel.quaternion.copy(currentCamera.quaternion);
+      // Reset spheres no longer hovered by either controller
+      previouslyHoveredSpheres.forEach(sphere => {
+        if (!currentlyHoveredSpheres.has(sphere) && sphere !== selectedSphere) {
+          sphere.scale.setScalar(sphere.userData.baseScale);
+          sphere.material.emissive.setHex(0x000000);
+        }
       });
 
-      // 5. Desktop Orbit Controls
+      // Highlight spheres currently hovered by either controller
+      currentlyHoveredSpheres.forEach(sphere => {
+        if (sphere !== selectedSphere) {
+          sphere.scale.setScalar(sphere.userData.baseScale * 1.28);
+          sphere.material.emissive.setHex(0x38bdf8);
+        }
+        previouslyHoveredSpheres.add(sphere);
+      });
+      previouslyHoveredSpheres.forEach(s => {
+        if (!currentlyHoveredSpheres.has(s)) previouslyHoveredSpheres.delete(s);
+      });
+
+      // Subtle scale highlight for hovered UI panels (legend & exit buttons)
+      previouslyHoveredPanels.forEach(panel => {
+        if (!currentlyHoveredPanels.has(panel)) {
+          panel.scale.setScalar(1.0);
+        }
+      });
+      currentlyHoveredPanels.forEach(panel => {
+        panel.scale.setScalar(1.06);
+        previouslyHoveredPanels.add(panel);
+      });
+      previouslyHoveredPanels.forEach(p => {
+        if (!currentlyHoveredPanels.has(p)) previouslyHoveredPanels.delete(p);
+      });
+
+      // 5. Parent-Aware World-Space Billboarding (Issue 3 Fix: Cancels plotCore rotation)
+      plotCore.updateMatrixWorld(true);
+      billboardPanels.forEach(panel => {
+        panel.getWorldPosition(panelWorldPos);
+        lookMatrix.lookAt(camWorldPos, panelWorldPos, worldUp);
+        targetWorldQuat.setFromRotationMatrix(lookMatrix);
+        if (panel.parent) {
+          panel.parent.getWorldQuaternion(parentWorldQuat);
+          panel.quaternion.copy(parentWorldQuat).invert().multiply(targetWorldQuat);
+        } else {
+          panel.quaternion.copy(targetWorldQuat);
+        }
+      });
+
       if (!renderer.xr.isPresenting) {
         controls.update();
       }
